@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}{{ '编辑用例' if case else '新建用例' }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 id="case-form-title">
+    {{ '编辑用例 #' ~ case['id'] if case else '新建用例' }}
+    <span class="muted small">· 项目 {{ project['name'] }}</span>
+  </h1>
+</div>
+
+{# 表单直提交给页面路由（服务端校验+落库），"快速执行"按钮走 fetch 调 API —— 两种交互各得其所 #}
+<form id="case-form" method="post"
+      action="{{ '/cases/' ~ case['id'] ~ '/edit' if case else '/cases/new?project_id=' ~ project['id'] }}">
+  <input type="hidden" name="project_id" value="{{ project['id'] }}">
+
+  <div class="form-row">
+    <label for="case-name">用例名（项目内唯一，重名保存会被拒绝）</label>
+    <input id="case-name" name="name" type="text" required
+           value="{{ case['name'] if case else '' }}">
+  </div>
+
+  <div class="form-grid">
+    <div class="form-row">
+      <label for="case-method">请求方法</label>
+      <select id="case-method" name="method">
+        {% for m in ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD'] %}
+        <option value="{{ m }}" {{ 'selected' if case and case['method'] == m else '' }}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-row grow">
+      <label for="case-path">路径（相对项目 base_url，以 / 开头）</label>
+      <input id="case-path" name="path" type="text" required
+             placeholder="/api/goods"
+             value="{{ case['path'] if case else '' }}">
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label for="case-headers">自定义请求头（JSON 对象，可空）</label>
+    <textarea id="case-headers" name="headers" rows="2" class="mono"
+              placeholder='{"X-Test-Key": "mall-test-key"}'>{{ case['headers'] if case else '' }}</textarea>
+  </div>
+
+  <div class="form-row">
+    <label for="case-params">查询参数（JSON 对象，可空；GET 用例的主要入参）</label>
+    <textarea id="case-params" name="params" rows="2" class="mono"
+              placeholder='{"page": 1, "page_size": 5}'>{{ case['params'] if case else '' }}</textarea>
+  </div>
+
+  <div class="form-row">
+    <label for="case-body">请求体（JSON，可空；POST/PUT 用例的主要入参）</label>
+    <textarea id="case-body" name="body" rows="3" class="mono"
+              placeholder='{"username": "lemon", "password": "123456"}'>{{ case['body'] if case else '' }}</textarea>
+  </div>
+
+  <div class="form-grid">
+    <div class="form-row">
+      <label for="case-auth-user">自动登录账号（可空 = 不带鉴权）</label>
+      <input id="case-auth-user" name="auth_user" type="text"
+             placeholder="lemon" value="{{ case['auth_user'] if case else '' }}">
+    </div>
+    <div class="form-row">
+      <label for="case-auth-pass">自动登录密码</label>
+      <input id="case-auth-pass" name="auth_pass" type="password"
+             placeholder="••••••" value="{{ case['auth_pass'] if case else '' }}">
+    </div>
+  </div>
+  <p class="muted small">填了账号，执行引擎会先调 {base_url}/api/auth/login 换 token 并缓存，再以 Bearer 头发正式请求。</p>
+
+  <fieldset id="expect-fieldset">
+    <legend>三层断言（每层可选；全不填 = 只发请求不断言）</legend>
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="expect-status">① HTTP 状态码</label>
+        <input id="expect-status" name="expect_status" type="number"
+               placeholder="200" value="{{ case['expect_status'] if case and case['expect_status'] is not none else '' }}">
+      </div>
+      <div class="form-row">
+        <label for="expect-code">② 业务 code（0 表示成功，留空 = 不断言）</label>
+        <input id="expect-code" name="expect_code" type="number"
+               placeholder="0" value="{{ case['expect_code'] if case and case['expect_code'] is not none else '' }}">
+      </div>
+    </div>
+    <div class="form-row">
+      <label for="expect-fields">③ 关键字段（JSON 对象：JSONPath → 期望值）</label>
+      <textarea id="expect-fields" name="expect_fields" rows="3" class="mono"
+                placeholder='{"$.data.user.username": "lemon"}'>{{ case['expect_fields'] if case else '' }}</textarea>
+    </div>
+  </fieldset>
+
+  <div class="form-actions">
+    <button id="btn-save-case" type="submit" class="btn-primary">保存</button>
+    {% if case %}
+    <button id="btn-quick-exec" type="button" class="btn-run" onclick="quickExec({{ case['id'] }})">▶ 执行并查看断言</button>
+    <a class="btn-plain" href="/projects/{{ project['id'] }}/cases">返回列表</a>
+    {% endif %}
+  </div>
+</form>
+
+<div id="quick-exec-result" class="panel {% if not case %}hidden{% endif %}">
+  <h3>执行结果（{{ '用例 ' ~ case['id'] if case else '先保存用例后才能执行' }}）</h3>
+  <pre id="quick-exec-output" class="mono">—</pre>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function quickExec(caseId) {
+  const out = document.getElementById("quick-exec-output");
+  out.textContent = "执行中…";
+  document.getElementById("quick-exec-result").classList.remove("hidden");
+  const resp = await fetch(`/api/cases/${caseId}/execute`, { method: "POST" });
+  const res = await resp.json();
+  if (res.code === 0) {
+    out.textContent = JSON.stringify(res.data, null, 2);
+  } else {
+    out.textContent = "执行失败：" + res.message;
+  }
+}
+</script>
+{% endblock %}

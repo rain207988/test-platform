@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}执行记录{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 id="executions-title">
+    {% if project %}{{ project['name'] }} · 执行记录{% else %}执行记录{% endif %}
+  </h1>
+  {% if project %}
+  <a class="btn-plain" href="/projects/{{ project['id'] }}/cases">← 返回用例列表</a>
+  {% endif %}
+</div>
+
+<table id="executions-table" class="data-table">
+  <thead>
+    <tr><th>批次ID</th><th>项目</th><th>状态</th><th>总数</th><th>通过</th>
+        <th>失败</th><th>通过率</th><th>耗时</th><th>时间</th></tr>
+  </thead>
+  <tbody>
+  {% for e in executions %}
+    <tr id="exec-row-{{ e['id'] }}">
+      <td><a href="/executions/{{ e['id'] }}">#{{ e['id'] }}</a></td>
+      <td>{{ e['project_name'] if e['project_name'] is defined else '' }}</td>
+      <td>
+        <span class="badge {{ 'badge-pass' if e['status'] == 'done' else ('badge-fail' if e['status'] == 'failed' else 'badge-none') }}">
+          {{ {'done': '全部通过', 'failed': '存在失败'}.get(e['status'], e['status']) }}
+        </span>
+      </td>
+      <td>{{ e['total'] }}</td>
+      <td class="pass-text">{{ e['passed'] }}</td>
+      <td class="{{ 'fail-text' if e['failed'] else 'muted' }}">{{ e['failed'] }}</td>
+      <td>{{ ((e['passed'] * 100 / e['total'])|round(1)) ~ '%' if e['total'] else '—' }}</td>
+      <td>{{ e['duration_ms'] }}ms</td>
+      <td class="muted small">{{ e['created_at'] }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="9" class="muted">还没有执行记录。到用例列表点"一键执行"。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

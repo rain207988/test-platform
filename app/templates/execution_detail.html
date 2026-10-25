@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}批次 #{{ execution['id'] }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 id="exec-title">批次 #{{ execution['id'] }}
+    <span class="badge {{ 'badge-pass' if execution['status'] == 'done' else 'badge-fail' }}" id="exec-status">
+      {{ '全部通过' if execution['status'] == 'done' else '存在失败' }}
+    </span>
+  </h1>
+  <a class="btn-plain" href="/projects/{{ execution['project_id'] }}/cases">← 返回用例列表</a>
+</div>
+
+<div id="exec-summary" class="panel slim summary-bar">
+  <span>项目：<strong>{{ execution['project_name'] }}</strong></span>
+  <span>被测环境：<span class="mono">{{ execution['base_url'] }}</span></span>
+  <span>总数 <strong id="exec-total">{{ execution['total'] }}</strong></span>
+  <span>通过 <strong id="exec-passed" class="pass-text">{{ execution['passed'] }}</strong></span>
+  <span>失败 <strong id="exec-failed" class="{{ 'fail-text' if execution['failed'] else 'muted' }}">{{ execution['failed'] }}</strong></span>
+  <span>通过率 <strong id="exec-pass-rate">{{ ((execution['passed'] * 100 / execution['total'])|round(1)) ~ '%' if execution['total'] else '—' }}</strong></span>
+  <span>总耗时 <strong id="exec-duration">{{ execution['duration_ms'] }}ms</strong></span>
+  <span class="muted small">{{ execution['created_at'] }}</span>
+</div>
+
+<p class="muted small">失败的用例默认展开，通过的折叠——优先看现场。</p>
+
+{% for it in items %}
+<details id="item-{{ it['id'] }}" class="exec-item" {% if not it['passed'] %}open{% endif %}>
+  <summary id="item-summary-{{ it['id'] }}">
+    <span class="badge {{ 'badge-pass' if it['passed'] else 'badge-fail' }}">{{ '通过' if it['passed'] else '失败' }}</span>
+    <span class="strong">{{ it['case_name'] }}</span>
+    <span class="muted small mono">
+      HTTP {{ it['status_code'] if it['status_code'] is not none else '—' }} ·
+      code {{ it['resp_code'] if it['resp_code'] is not none else '—' }} ·
+      {{ it['duration_ms'] }}ms
+    </span>
+  </summary>
+
+  <div class="exec-item-body">
+    <h4>请求快照</h4>
+    <pre id="item-request-{{ it['id'] }}" class="snapshot mono">{{ it['request_snapshot']|tojson_pretty }}</pre>
+
+    <h4>响应快照</h4>
+    <pre id="item-response-{{ it['id'] }}" class="snapshot mono">{{ it['response_snapshot']|tojson_pretty }}</pre>
+
+    <h4>断言明细（{{ it['asserts']|selectattr('passed')|list|length }}/{{ it['asserts']|length }} 通过）</h4>
+    <table id="item-asserts-{{ it['id'] }}" class="data-table asserts-table">
+      <thead><tr><th>检查项</th><th>期望</th><th>实际</th><th>结果</th><th>说明</th></tr></thead>
+      <tbody>
+      {% for a in it['asserts'] %}
+        <tr class="{{ 'assert-pass' if a['passed'] else 'assert-fail' }}">
+          <td class="mono">{{ a['item'] }}</td>
+          <td class="mono">{{ a['expected'] }}</td>
+          <td class="mono">{{ a['actual'] }}</td>
+          <td><span class="badge {{ 'badge-pass' if a['passed'] else 'badge-fail' }}">{{ '✓' if a['passed'] else '✗' }}</span></td>
+          <td class="muted small">{{ a['message'] }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="muted">该用例没有配置断言，仅发请求记录快照。</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
+{% else %}
+<div class="panel"><p class="muted">该批次没有任何明细（可能是异步执行尚未完成）。</p></div>
+{% endfor %}
+{% endblock %}

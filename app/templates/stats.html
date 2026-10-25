@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}统计{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 id="stats-title">平台统计</h1>
+</div>
+
+<div class="stat-cards">
+  <div class="stat-card" id="stat-card-projects">
+    <div class="stat-num">{{ counts.projects }}</div>
+    <div class="stat-label">项目数</div>
+  </div>
+  <div class="stat-card" id="stat-card-cases">
+    <div class="stat-num">{{ counts.cases }}</div>
+    <div class="stat-label">用例总数</div>
+  </div>
+  <div class="stat-card" id="stat-card-executions">
+    <div class="stat-num">{{ counts.executions }}</div>
+    <div class="stat-label">执行批次</div>
+  </div>
+  <div class="stat-card" id="stat-card-items">
+    <div class="stat-num">{{ counts.cases_passed }}/{{ counts.cases_total }}</div>
+    <div class="stat-label">用例执行通过/总数（累计）</div>
+  </div>
+  <div class="stat-card" id="stat-card-last">
+    <div class="stat-num">
+      {% if last_exec and last_exec['total'] %}
+        {{ ((last_exec['passed'] * 100 / last_exec['total'])|round(1)) ~ '%' }}
+      {% else %}—{% endif %}
+    </div>
+    <div class="stat-label">最近一次批次通过率</div>
+  </div>
+</div>
+
+{% if last_exec %}
+<div class="panel slim" id="stats-last-batch">
+  最近批次：<a href="/executions/{{ last_exec['id'] }}">#{{ last_exec['id'] }}</a>
+  {{ last_exec['project_name'] }} ——
+  {{ last_exec['passed'] }}/{{ last_exec['total'] }} 通过，
+  {{ last_exec['duration_ms'] }}ms，{{ last_exec['created_at'] }}
+</div>
+{% endif %}
+
+<h2>最近 10 个批次</h2>
+<table id="stats-recent-table" class="data-table">
+  <thead><tr><th>批次</th><th>项目</th><th>状态</th><th>通过/总数</th><th>耗时</th><th>时间</th></tr></thead>
+  <tbody>
+  {% for e in recent %}
+    <tr id="stat-row-{{ e['id'] }}">
+      <td><a href="/executions/{{ e['id'] }}">#{{ e['id'] }}</a></td>
+      <td>{{ e['project_name'] }}</td>
+      <td>
+        <span class="badge {{ 'badge-pass' if e['status'] == 'done' else 'badge-fail' }}">
+          {{ '全部通过' if e['status'] == 'done' else '存在失败' }}
+        </span>
+      </td>
+      <td>{{ e['passed'] }}/{{ e['total'] }}</td>
+      <td>{{ e['duration_ms'] }}ms</td>
+      <td class="muted small">{{ e['created_at'] }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="muted">暂无执行记录</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

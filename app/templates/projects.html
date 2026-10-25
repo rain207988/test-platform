@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}项目{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 id="projects-title">项目列表</h1>
+  <button id="btn-new-project" class="btn-primary" onclick="toggleNewForm()">＋ 新建项目</button>
+</div>
+
+<details id="new-project-panel" class="panel" {% if not projects %}open{% endif %}>
+  <summary>新建项目（名称唯一；base_url 是该项目用例的默认被测环境）</summary>
+  <form id="new-project-form" onsubmit="return createProject(event)">
+    <div class="form-row">
+      <label for="new-project-name">项目名</label>
+      <input id="new-project-name" type="text" required placeholder="如：Demo商城接口">
+    </div>
+    <div class="form-row">
+      <label for="new-project-base-url">被测环境 base_url</label>
+      <input id="new-project-base-url" type="text" placeholder="http://127.0.0.1:5000">
+    </div>
+    <div class="form-row">
+      <label for="new-project-desc">描述</label>
+      <input id="new-project-desc" type="text" placeholder="可选">
+    </div>
+    <button id="btn-create-project" type="submit" class="btn-primary">创建</button>
+  </form>
+</details>
+
+<table id="projects-table" class="data-table">
+  <thead>
+    <tr>
+      <th>ID</th><th>项目名</th><th>被测环境</th><th>用例数</th>
+      <th>最近一次批次</th><th>操作</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for p in projects %}
+    <tr id="project-row-{{ p['id'] }}">
+      <td>{{ p['id'] }}</td>
+      <td><a class="strong" href="/projects/{{ p['id'] }}/cases">{{ p['name'] }}</a>
+        {% if p['description'] %}<div class="muted small">{{ p['description'] }}</div>{% endif %}
+      </td>
+      <td class="mono">{{ p['base_url'] or '—' }}</td>
+      <td>{{ p['case_count'] }}</td>
+      <td>
+        {% if p['last_execution_id'] %}
+          <span class="badge {{ 'badge-pass' if p['last_status'] == 'done' else 'badge-fail' }}">
+            {{ '通过' if p['last_status'] == 'done' else '失败' }} {{ p['last_passed'] }}/{{ p['last_total'] }}
+          </span>
+          <a class="small" href="/executions/{{ p['last_execution_id'] }}">详情</a>
+        {% else %}
+          <span class="badge badge-none">未执行</span>
+        {% endif %}
+      </td>
+      <td class="actions">
+        <a href="/projects/{{ p['id'] }}/cases" class="btn-small">用例</a>
+        <a href="/projects/{{ p['id'] }}/executions" class="btn-small">执行记录</a>
+        <button id="btn-exec-project-{{ p['id'] }}" class="btn-small btn-run"
+                {% if not p['case_count'] %}disabled{% endif %}
+                onclick="executeProject({{ p['id'] }})">一键执行</button>
+        <button id="btn-del-project-{{ p['id'] }}" class="btn-small btn-danger"
+                onclick="deleteProject({{ p['id'] }}, '{{ p['name'] }}')">删除</button>
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="muted">还没有项目，点右上角"新建项目"创建一个。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// fetch 帮手：统一带 JSON 头、解析平台统一响应格式 {code,message,data}
+async function api(url, options = {}) {
+  const resp = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  return resp.json();
+}
+function toggleNewForm() {
+  const panel = document.getElementById("new-project-panel");
+  panel.open = !panel.open;
+  if (panel.open) document.getElementById("new-project-name").focus();
+}
+async function createProject(event) {
+  event.preventDefault();
+  const body = {
+    name: document.getElementById("new-project-name").value.trim(),
+    base_url: document.getElementById("new-project-base-url").value.trim(),
+    description: document.getElementById("new-project-desc").value.trim(),
+  };
+  const res = await api("/api/projects", { method: "POST", body: JSON.stringify(body) });
+  if (res.code === 0) { location.reload(); }
+  else { alert("创建失败：" + res.message); }
+  return false;
+}
+async function deleteProject(id, name) {
+  if (!confirm(`确认删除项目「${name}」？其用例与执行记录会一并删除。`)) return;
+  const res = await api(`/api/projects/${id}`, { method: "DELETE" });
+  if (res.code === 0) location.reload();
+  else alert("删除失败：" + res.message);
+}
+async function executeProject(id) {
+  const btn = document.getElementById(`btn-exec-project-${id}`);
+  btn.disabled = true; btn.textContent = "执行中…";
+  const res = await api(`/api/projects/${id}/execute`, { method: "POST" });
+  if (res.code === 0) { location.href = `/executions/${res.data.execution_id}`; }
+  else { alert("执行失败：" + res.message); btn.disabled = false; btn.textContent = "一键执行"; }
+}
+</script>
+{% endblock %}

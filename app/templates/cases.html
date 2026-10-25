@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ project['name'] }} · 用例{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 id="cases-title">{{ project['name'] }} · 用例列表</h1>
+    <p class="muted mono small">被测环境：{{ project['base_url'] or '（未配置）' }}</p>
+  </div>
+  <div class="head-actions">
+    <a id="btn-new-case" class="btn-primary" href="/cases/new?project_id={{ project['id'] }}">＋ 新建用例</a>
+    <button id="btn-exec-all" class="btn-run"
+            {% if not cases %}disabled{% endif %}
+            onclick="executeAll()">▶ 一键执行全部（{{ cases|length }} 条）</button>
+  </div>
+</div>
+
+<div id="last-batch-bar" class="panel slim">
+  <span>最近一次批次：</span>
+  {% if last_exec %}
+    <a href="/executions/{{ last_exec['id'] }}" id="last-pass-rate"
+       class="badge {{ 'badge-pass' if last_exec['status'] == 'done' else 'badge-fail' }}">
+      {{ '通过率 100%' if last_exec['status'] == 'done' else
+          '通过率 ' + ((last_exec['passed'] * 100 / last_exec['total'])|round(1)|string) + '%' }}
+      （{{ last_exec['passed'] }}/{{ last_exec['total'] }}，{{ last_exec['duration_ms'] }}ms）
+    </a>
+    <a class="small" href="/projects/{{ project['id'] }}/executions">全部批次 →</a>
+  {% else %}
+    <span id="last-pass-rate" class="badge badge-none">尚未执行</span>
+  {% endif %}
+</div>
+
+<table id="cases-table" class="data-table">
+  <thead>
+    <tr>
+      <th>ID</th><th>用例名</th><th>请求</th><th>鉴权</th><th>期望</th>
+      <th>最近结果</th><th>操作</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for c in cases %}
+    <tr id="case-row-{{ c['id'] }}">
+      <td>{{ c['id'] }}</td>
+      <td class="strong">{{ c['name'] }}</td>
+      <td class="mono">
+        <span class="method method-{{ c['method']|lower }}">{{ c['method'] }}</span>
+        {{ c['path'] }}
+      </td>
+      <td class="muted">{{ '自动登录 ' + c['auth_user'] if c['auth_user'] else '—' }}</td>
+      <td class="mono small muted">
+        {{ c['expect_status'] if c['expect_status'] is not none else '·' }} /
+        {{ c['expect_code'] if c['expect_code'] is not none else '·' }} /
+        {{ (c['expect_fields']|length) if c['expect_fields'] else '·' }}
+      </td>
+      <td>
+        {% set li = latest.get(c['id']) %}
+        <span id="badge-case-{{ c['id'] }}"
+              class="badge {{ 'badge-pass' if li and li['passed'] else ('badge-fail' if li else 'badge-none') }}">
+          {{ '通过' if li and li['passed'] else ('失败' if li else '未执行') }}
+        </span>
+        {% if li %}<a class="small" href="/executions/{{ li['execution_id'] }}">批次</a>{% endif %}
+      </td>
+      <td class="actions">
+        <button id="btn-exec-case-{{ c['id'] }}" class="btn-small btn-run"
+                onclick="executeOne({{ c['id'] }})">执行</button>
+        <a id="btn-edit-case-{{ c['id'] }}" class="btn-small"
+           href="/cases/{{ c['id'] }}/edit">编辑</a>
+        <button id="btn-del-case-{{ c['id'] }}" class="btn-small btn-danger"
+                onclick="deleteCase({{ c['id'] }}, '{{ c['name'] }}')">删除</button>
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="muted">还没有用例：点"新建用例"，或用 scripts/import_demo_mall.py 批量导入。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function api(url, options = {}) {
+  const resp = await fetch(url, { headers: { "Content-Type": "application/json" }, ...options });
+  return resp.json();
+}
+// 执行后原地更新徽标，不整页刷新——演示"fetch + 服务端 JSON"的最小闭环
+function setBadge(caseId, passed) {
+  const badge = document.getElementById(`badge-case-${caseId}`);
+  badge.className = "badge " + (passed ? "badge-pass" : "badge-fail");
+  badge.textContent = passed ? "通过" : "失败";
+}
+async function executeOne(caseId) {
+  const btn = document.getElementById(`btn-exec-case-${caseId}`);
+  btn.disabled = true; btn.textContent = "…";
+  const res = await api(`/api/cases/${caseId}/execute`, { method: "POST" });
+  btn.disabled = false; btn.textContent = "执行";
+  if (res.code === 0) {
+    setBadge(caseId, res.data.passed > 0);
+    btn.title = `HTTP ${res.data.status_code ?? "-"} / ${res.data.duration_ms}ms`;
+  } else { alert("执行失败：" + res.message); }
+}
+async function executeAll() {
+  const btn = document.getElementById("btn-exec-all");
+  btn.disabled = true; btn.textContent = "批量执行中…";
+  const res = await api(`/api/projects/{{ project['id'] }}/execute`, { method: "POST" });
+  if (res.code === 0) { location.href = `/executions/${res.data.execution_id}`; }
+  else { alert("执行失败：" + res.message); btn.disabled = false; btn.textContent = "▶ 一键执行全部"; }
+}
+async function deleteCase(caseId, name) {
+  if (!confirm(`确认删除用例「${name}」？`)) return;
+  const res = await api(`/api/cases/${caseId}`, { method: "DELETE" });
+  if (res.code === 0) { document.getElementById(`case-row-${caseId}`).remove(); }
+  else alert("删除失败：" + res.message);
+}
+</script>
+{% endblock %}

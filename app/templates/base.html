@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}test-platform{% endblock %} · 接口测试平台</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <nav id="top-nav">
+    <a class="brand" href="/projects">test-platform<span>轻量级接口测试平台</span></a>
+    <div class="nav-links">
+      <a href="/projects" id="nav-projects">项目</a>
+      <a href="/executions" id="nav-executions">执行记录</a>
+      <a href="/stats" id="nav-stats">统计</a>
+    </div>
+    <div class="nav-user">
+      {% if current_username %}
+        <span id="nav-user">👤 {{ current_username }}</span>
+        <a href="/logout" id="nav-logout">退出</a>
+      {% else %}
+        <a href="/login" id="nav-login">登录</a>
+      {% endif %}
+    </div>
+  </nav>
+
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-area">
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category or 'info' }}" id="flash-message">{{ message }}</div>
+        {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+
+  <footer id="page-footer">test-platform · Flask + SQLite 服务端渲染 · 与被测系统 demo-mall 同栈</footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

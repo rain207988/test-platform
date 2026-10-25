@@ -1,0 +1,10 @@
+# 运行期可变数据：数据库实例与缓存
+instance/
+*.db
+
+# Python 运行产物
+__pycache__/
+*.pyc
+
+# 测试缓存
+.pytest_cache/
